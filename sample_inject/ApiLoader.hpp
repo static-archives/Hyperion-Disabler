@@ -14,10 +14,11 @@ namespace ApiLoader
 {
     enum BreakpointCondition : int32_t { Execute = 0, Write = 1, ReadWrite = 3 };
 
-    typedef uintptr_t(__fastcall* t_syscall_detour)(uintptr_t stack, int64_t is_hyperion, uintptr_t callee, uintptr_t rax);
+    typedef uintptr_t(__fastcall* t_icallback)(uintptr_t stack, int64_t is_hyperion, uintptr_t callee, uintptr_t rax);
     typedef int64_t(__fastcall* t_exception_handler)(PEXCEPTION_RECORD precord, PCONTEXT pctx);
     typedef bool (NTAPI* t_thread_init)(PCONTEXT start_context);
     typedef bool (NTAPI* t_user_tls_callback)(PVOID h, DWORD dwReason, PVOID pv, uintptr_t stack);
+    typedef void(__fastcall* t_syscall_detour)(DWORD syscallId, PCONTEXT pctx);
 
 	uintptr_t* fnlist = nullptr;
 	uintptr_t* indata = nullptr;
@@ -28,7 +29,7 @@ namespace ApiLoader
         fnlist = reinterpret_cast<uintptr_t*>(&indata[54]);
 	}
 
-    void set_syscall_detour(t_syscall_detour f)
+    void set_instrumentation_callback(t_icallback f)
     {
         fnlist[0] = reinterpret_cast<uintptr_t>(f);
     }
@@ -46,6 +47,11 @@ namespace ApiLoader
     void set_tls_callback(t_user_tls_callback f)
     {
         fnlist[3] = reinterpret_cast<uintptr_t>(f);
+    }
+
+    void set_syscall_detour(t_syscall_detour f)
+    {
+        fnlist[6] = reinterpret_cast<uintptr_t>(f);
     }
 
     static inline void set_bits(unsigned long& dw, int lowBit, int bits, int newValue)
