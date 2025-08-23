@@ -3,9 +3,10 @@
 #include "ApiLoader.hpp"
 #include <cstdint>
 #include <stdio.h>
+#include <fstream>
 
 // Custom TLS callback!
-bool mytlscallback(PVOID h, DWORD reason, PVOID pv, uintptr_t)
+bool on_tls_callback(PVOID h, DWORD reason, PVOID pv, uintptr_t)
 {
     MessageBoxA(0, "TLS CALLBACK FIRED!", "", MB_OK);
 
@@ -14,8 +15,19 @@ bool mytlscallback(PVOID h, DWORD reason, PVOID pv, uintptr_t)
 
 std::uintptr_t module_base;
 
+// Detour for every hyperion syscall (pre-IC) (excluded in this release)
+void on_syscall(DWORD syscallId, PCONTEXT pctx)
+{
+    std::fstream out("C:/syscalls.txt", std::ios::out);
+    if (out.is_open())
+    {
+        out << "Syscall at " << std::hex << pctx->Rip << ". ID: " << std::hex << syscallId << ".";
+        out.close();
+    }
+}
+
 // Custom exception handler!
-int64_t myexceptionhandler(PEXCEPTION_RECORD precord, PCONTEXT pctx)
+int64_t on_exception(PEXCEPTION_RECORD precord, PCONTEXT pctx)
 {
     // Only handle exceptions occurring from this DLL
     if (reinterpret_cast<std::uintptr_t>(precord->ExceptionAddress) < module_base || reinterpret_cast<std::uintptr_t>(precord->ExceptionAddress) > module_base + 0x10000000)
@@ -55,19 +67,21 @@ void load_exploit(std::uintptr_t dll_base)
 {
     module_base = dll_base;
 
+    //ApiLoader::set_syscall_detour(on_syscall);
+
     // Uncomment to demonstrate custom tls callback:
-    //ApiLoader::set_tls_callback(mytlscallback);
+    //ApiLoader::set_tls_callback(on_tls_callback);
 
     // Uncomment to demonstrate custom exception handling:
-    //ApiLoader::set_exception_handler(myexceptionhandler);
+    //ApiLoader::set_exception_handler(on_exception);
     //__debugbreak();
 
     // Not included in this release \/
     // Uncomment to demonstrate hardware breakpoints:
-    //ApiLoader::set_exception_handler(myexceptionhandler);
+    //ApiLoader::set_exception_handler(on_exception);
     //ApiLoader::set_breakpoint(0, 0x7FFE0308, ApiLoader::BreakpointCondition::ReadWrite);
 
-    //MessageBoxA(0, "Loaded! Eureka!", "", MB_OK);
+    MessageBoxA(0, "Injected!", "", MB_OK);
 }
 
 BOOL APIENTRY DllMain( HMODULE hModule,
